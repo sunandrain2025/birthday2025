@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 关键修改：防止双击缩放，优化视口适配 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Lesson 12.07: 生日特训</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+
+        :root {
+            --duo-green: #58cc02;
+            --duo-dark-green: #46a302;
+            --duo-red: #ff4b4b;
+            --duo-dark-red: #ea2b2b;
+            --duo-blue: #1cb0f6;
+            --duo-orange: #ff9600;
+            --text-color: #3c3c3c;
+            --gray-light: #e5e5e5;
+            --bg-color: #ffffff;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            /* 关键修改：使用 dvh 适配移动端动态高度，fallback 到 100vh */
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* 保持外层不滚动 */
+        }
+
+        /* --- 顶部导航栏 (固定) --- */
+        .header {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            gap: 15px;
+            flex-shrink: 0; /* 防止被压缩 */
+            z-index: 10;
+            background: white;
+        }
+
+        .close-btn { font-size: 1.5rem; color: #afafaf; }
+
+        .progress-container {
+            flex: 1;
+            height: 16px;
+            background-color: var(--gray-light);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: var(--duo-green);
+            width: 10%;
+            border-radius: 8px;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .progress-highlight {
+            position: absolute; top: 3px; left: 5px; right: 5px; height: 4px;
+            background-color: rgba(255,255,255,0.3); border-radius: 4px;
+        }
+
+        .hearts { display: flex; align-items: center; color: var(--duo-red); font-weight: 900; font-size: 1.2rem; }
+        .heart-icon { margin-right: 5px; font-size: 1.4rem; }
+
+        /* --- 主体内容区 (可滚动) --- */
+        .main-content {
+            flex: 1; /* 占据剩余空间 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* 改为顶部对齐，防止内容少时居中但内容多时切头 */
+            padding: 20px;
+            padding-bottom: 40px; /* 给底部留余量 */
+            width: 100%;
+            overflow-y: auto; /* 关键修改：允许中间区域垂直滚动 */
+            -webkit-overflow-scrolling: touch; /* iOS 滚动回弹 */
+        }
+
+        /* 只有当屏幕很高时，才让内容居中 */
+        @media (min-height: 700px) {
+            .main-content { justify-content: center; }
+        }
+
+        /* --- 多儿 CSS Art --- */
+        .duo-wrapper {
+            position: relative;
+            width: 160px;
+            height: 150px;
+            margin: 10px 0 40px 0; /* 调整边距 */
+            flex-shrink: 0; /* 防止多儿被压扁 */
+        }
+
+        .duo-body {
+            width: 100%; height: 100%;
+            background-color: var(--duo-green);
+            border-radius: 50% 50% 45% 45%;
+            position: relative;
+            box-shadow: 0 8px 0 var(--duo-dark-green);
+            transition: background-color 0.3s;
+            z-index: 2;
+        }
+
+        .duo-eye {
+            width: 44px; height: 44px; background: white; border-radius: 50%;
+            position: absolute; top: 45px; z-index: 3;
+        }
+        .eye-left { left: 28px; transform: rotate(-5deg); }
+        .eye-right { right: 28px; transform: rotate(5deg); }
+
+        .duo-pupil {
+            width: 16px; height: 16px; background: #333; border-radius: 50%;
+            position: absolute; top: 14px; left: 14px; transition: all 0.2s;
+        }
+
+        .duo-beak-main {
+            width: 32px; height: 24px; background: var(--duo-orange);
+            border-radius: 50% 50% 50% 10%;
+            position: absolute; top: 82px; left: 64px; z-index: 4;
+            transform: rotate(45deg);
+        }
+
+        .duo-wing {
+            width: 36px; height: 50px; background-color: var(--duo-green);
+            position: absolute; top: 80px; border-radius: 50%; z-index: 1;
+            box-shadow: 0 4px 0 var(--duo-dark-green);
+        }
+        .wing-left { left: -10px; transform: rotate(20deg); }
+        .wing-right { right: -10px; transform: rotate(-20deg); }
+
+        .duo-feet {
+            width: 24px; height: 12px; background: var(--duo-orange);
+            position: absolute; bottom: -8px; border-radius: 20px; z-index: 0;
+        }
+        .foot-left { left: 35px; transform: rotate(-10deg); }
+        .foot-right { right: 35px; transform: rotate(10deg); }
+
+        /* 气泡 */
+        .speech-bubble {
+            border: 2px solid var(--gray-light);
+            background: #fff; border-radius: 18px; padding: 15px 20px;
+            position: absolute; top: -80px; left: 50%; transform: translateX(-50%);
+            white-space: nowrap; font-weight: 800; color: var(--duo-blue);
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+            box-shadow: 0 4px 0 var(--gray-light); z-index: 10;
+        }
+        .speech-bubble::after {
+            content: ''; position: absolute; bottom: -9px; left: 50%;
+            transform: translateX(-50%) rotate(45deg); width: 12px; height: 12px;
+            background: #fff; border-right: 2px solid var(--gray-light); border-bottom: 2px solid var(--gray-light);
+        }
+
+        /* --- 题目区域 --- */
+        #question-container { width: 100%; max-width: 500px; }
+
+        .question-text {
+            font-size: 1.4rem; font-weight: 800; text-align: left;
+            margin-bottom: 20px; line-height: 1.4;
+        }
+
+        .highlight-text {
+            color: var(--duo-green); text-decoration: underline;
+            text-decoration-thickness: 4px; text-underline-offset: 4px;
+        }
+
+        .options-grid { display: flex; flex-direction: column; gap: 12px; }
+
+        .option-card {
+            background: #fff; border: 2px solid var(--gray-light); border-radius: 16px;
+            padding: 16px 20px; font-size: 1.1rem; font-weight: 700; color: #4b4b4b;
+            box-shadow: 0 2px 0 var(--gray-light); cursor: pointer;
+            display: flex; align-items: center; position: relative;
+            /* 增加点击区域反馈速度 */
+            transition: background-color 0.1s, transform 0.1s;
+        }
+
+        .option-card:active { transform: translateY(2px); box-shadow: none; border-color: var(--gray-light); }
+        .option-card.selected { background: #ddf4ff; border-color: var(--duo-blue); color: var(--duo-blue); box-shadow: 0 2px 0 #1899d6; }
+        .option-card.wrong { background: #ffdfe0; border-color: var(--duo-red); color: var(--duo-dark-red); box-shadow: 0 2px 0 #ea2b2b; animation: shake 0.4s; }
+
+        .key-number {
+            border: 2px solid var(--gray-light); border-radius: 8px; width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center; margin-right: 15px;
+            font-size: 0.9rem; color: #afafaf; font-weight: 800; flex-shrink: 0;
+        }
+
+        .option-card.selected .key-number { border-color: var(--duo-blue); color: var(--duo-blue); background: white; }
+        .option-card.wrong .key-number { border-color: var(--duo-red); color: var(--duo-red); background: white; }
+
+        /* --- 底部操作栏 (固定在底部) --- */
+        .footer {
+            padding: 15px 20px;
+            /* 适配 iPhone X 等底部安全区域 */
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+            border-top: 2px solid var(--gray-light);
+            display: flex; flex-direction: column;
+            background: #fff;
+            z-index: 50;
+            flex-shrink: 0; /* 关键：绝不压缩底部 */
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        }
+
+        .result-feedback {
+            margin-bottom: 15px; padding: 15px; border-radius: 12px; display: none;
+            font-size: 1.1rem; font-weight: 800;
+            animation: popIn 0.3s;
+        }
+
+        .result-feedback.correct { background-color: #d7ffb8; color: var(--duo-dark-green); }
+        .result-feedback.wrong { background-color: #ffdfe0; color: var(--duo-dark-red); }
+
+        .btn-check {
+            background: var(--duo-green); color: white; font-family: inherit;
+            font-size: 1.1rem; font-weight: 800; text-transform: uppercase;
+            padding: 14px; width: 100%; border: none; border-radius: 16px;
+            box-shadow: 0 4px 0 var(--duo-dark-green); cursor: pointer;
+            text-align: center; transition: all 0.1s;
+        }
+
+        .btn-check:active { transform: translateY(4px); box-shadow: 0 0 0 var(--duo-dark-green); }
+        .btn-check.disabled { background: var(--gray-light); color: #afafaf; box-shadow: none; pointer-events: none; }
+        .btn-check.wrong-state { background: var(--duo-red); box-shadow: 0 4px 0 var(--duo-dark-red); }
+        .btn-check.wrong-state:active { box-shadow: 0 0 0 var(--duo-dark-red); }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+        }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* 最终页面 */
+        #final-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #58cc02; z-index: 100; display: none;
+            flex-direction: column; align-items: center; justify-content: center;
+            color: white; text-align: center; padding: 30px;
+            overflow-y: auto; /* 允许最终页滚动 */
+        }
+
+        .wishes-box {
+            background: rgba(255,255,255,0.2); padding: 25px; border-radius: 20px;
+            font-size: 1.1rem; line-height: 1.6; max-width: 100%;
+            backdrop-filter: blur(5px); border: 2px solid rgba(255,255,255,0.3);
+            margin-bottom: 20px;
+        }
+
+        #confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部UI -->
+    <div class="header">
+        <div class="close-btn">✕</div>
+        <div class="progress-container">
+            <div class="progress-bar" id="progress">
+                <div class="progress-highlight"></div>
+            </div>
+        </div>
+        <div class="hearts"><span class="heart-icon">❤️</span><span id="lives">5</span></div>
+    </div>
+
+    <!-- 学习界面 (可滚动) -->
+    <div class="main-content" id="quiz-screen">
+        <div class="speech-bubble" id="duo-speak">请专心点！</div>
+
+        <div class="duo-wrapper" id="duo">
+            <div class="duo-body">
+                <div class="duo-eye eye-left"><div class="duo-pupil"></div></div>
+                <div class="duo-eye eye-right"><div class="duo-pupil"></div></div>
+                <div class="duo-beak-main"></div>
+                <div class="duo-wing wing-left"></div>
+                <div class="duo-wing wing-right"></div>
+                <div class="duo-feet foot-left"></div>
+                <div class="duo-feet foot-right"></div>
+            </div>
+        </div>
+
+        <div id="question-container">
+            <div class="question-text" id="q-text">题目加载中...</div>
+            <div class="options-grid" id="options"></div>
+        </div>
+    </div>
+
+    <!-- 底部操作栏 (固定) -->
+    <div class="footer" id="footer">
+        <div class="result-feedback" id="result-feedback">
+            <span class="result-title"></span>
+            <span class="result-comment"></span>
+        </div>
+        <button class="btn-check disabled" id="check-btn">检查</button>
+    </div>
+
+    <!-- 最终通关界面 -->
+    <div id="final-screen">
+        <h1>连胜达成！🎉</h1>
+        <div class="wishes-box">
+            <p><strong>Lesson Complete! +365 XP</strong></p>
+            <p>
+                恭喜你存活到了 12月7日！<br>
+                多儿（Duo）提醒你：<br>
+                新的一岁，请继续保持<br>
+                <strong>“快乐连续打卡”</strong>记录！<br>
+                <br>
+                🎂 Happy Birthday! 🎂
+            </p>
+        </div>
+        <button class="btn-check" onclick="location.reload()" style="background: white; color: #58cc02; width: 100%;">再来亿遍</button>
+    </div>
+
+    <canvas id="confetti"></canvas>
+
+    <script>
+        const state = { step: 0, lives: 5, selectedOption: null, hasChecked: false };
+
+        const questions = [
+            {
+                text: "请选择正确的翻译：<br>Today is <span class='highlight-text'>12/07</span>.",
+                options: [
+                    { text: "今天是普通的星期天", correct: false, response: "普通？你再仔细想想？🔪" },
+                    { text: "今天是我的生日！", correct: true, response: "答对了！求生欲很强！" },
+                    { text: "今天是世界末日TVT", correct: false, response: "对你的寿命来说可能是..." }
+                ]
+            },
+            {
+                text: "请补全句子：<br>因为今天是生日，所以必须 ______ 。",
+                options: [
+                    { text: "背单词", correct: false, response: "虽然我很想选这个，但...你是魔鬼吗？" },
+                    { text: "加班/写作业", correct: false, response: "Duo 听了都流泪，禁止内卷！" },
+                    { text: "快乐庆祝，吃蛋糕", correct: true, response: "Excellent! 这才是标准答案！🎂" }
+                ]
+            },
+            {
+                text: "听力理解（请脑补多儿的声音）：<br>Happy Birthday to you! 🦉",
+                options: [
+                    { text: "谢谢多儿（乖巧）", correct: true, response: "乖！今天不杀你！" },
+                    { text: "退订/卸载", correct: false, response: "你 逃 不 掉 的 🔥" }
+                ]
+            }
+        ];
+
+        const ui = {
+            progress: document.getElementById('progress'),
+            lives: document.getElementById('lives'),
+            qText: document.getElementById('q-text'),
+            options: document.getElementById('options'),
+            checkBtn: document.getElementById('check-btn'),
+            duo: document.getElementById('duo'),
+            duoBody: document.querySelector('.duo-body'),
+            duoSpeak: document.getElementById('duo-speak'),
+            feedback: document.getElementById('result-feedback'),
+            finalScreen: document.getElementById('final-screen'),
+            mainContent: document.getElementById('quiz-screen') // 获取滚动容器
+        };
+
+        function init() { renderQuestion(); }
+
+        function renderQuestion() {
+            const q = questions[state.step];
+            ui.qText.innerHTML = q.text;
+            ui.options.innerHTML = '';
+
+            ui.feedback.style.display = 'none';
+            ui.checkBtn.innerText = "检查";
+            ui.checkBtn.className = "btn-check disabled";
+            ui.checkBtn.onclick = checkAnswer;
+
+            state.selectedOption = null;
+            state.hasChecked = false;
+            setDuoState('normal');
+            ui.progress.style.width = Math.max(10, (state.step / questions.length) * 100) + '%';
+
+            q.options.forEach((opt, index) => {
+                const card = document.createElement('div');
+                card.className = 'option-card';
+                card.innerHTML = `<div class="key-number">${index + 1}</div> ${opt.text}`;
+                card.onclick = () => selectOption(index, card);
+                ui.options.appendChild(card);
+            });
+        }
+
+        function selectOption(index, element) {
+            if (state.hasChecked) return;
+            document.querySelectorAll('.option-card').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            state.selectedOption = questions[state.step].options[index];
+            state.selectedElement = element;
+            ui.checkBtn.classList.remove('disabled');
+            setDuoState('watching');
+            playAudio('click');
+        }
+
+        function checkAnswer() {
+            if (!state.selectedOption) return;
+            state.hasChecked = true;
+            const isCorrect = state.selectedOption.correct;
+
+            ui.feedback.style.display = 'block';
+            ui.feedback.className = isCorrect ? 'result-feedback correct' : 'result-feedback wrong';
+            ui.feedback.querySelector('.result-title').innerText = isCorrect ? "✨ 太棒了！" : "❌ 答错了";
+            ui.feedback.querySelector('.result-comment').innerText = state.selectedOption.response;
+
+            if (isCorrect) {
+                state.selectedElement.style.backgroundColor = "#d7ffb8";
+                state.selectedElement.style.borderColor = "#58cc02";
+                setDuoState('happy');
+                playAudio('success');
+                ui.checkBtn.innerText = "继续";
+                ui.checkBtn.className = "btn-check";
+                ui.checkBtn.onclick = nextStep;
+            } else {
+                state.lives--;
+                ui.lives.innerText = state.lives;
+                state.selectedElement.classList.add('wrong');
+                setDuoState('angry');
+                playAudio('error');
+                ui.checkBtn.innerText = state.lives <= 0 ? "重新开始" : "继续";
+                ui.checkBtn.className = "btn-check wrong-state";
+                ui.checkBtn.onclick = state.lives <= 0 ? () => location.reload() : nextStep;
+            }
+
+            // 关键修复：如果内容被反馈撑高，自动滚动到底部，确保看到反馈
+            setTimeout(() => {
+                ui.mainContent.scrollTo({ top: ui.mainContent.scrollHeight, behavior: 'smooth' });
+            }, 100);
+        }
+
+        function nextStep() {
+            if (state.lives <= 0) return;
+            state.step++;
+            if (state.step >= questions.length) showFinalScreen();
+            else renderQuestion();
+        }
+
+        function showFinalScreen() {
+            ui.progress.style.width = '100%';
+            ui.finalScreen.style.display = 'flex';
+            playAudio('success');
+            startConfetti();
+        }
+
+        function setDuoState(mood) {
+            const pupils = document.querySelectorAll('.duo-pupil');
+            const body = ui.duoBody;
+            const bubble = ui.duoSpeak;
+            body.style.backgroundColor = "var(--duo-green)";
+            ui.duo.style.transform = "scale(1)";
+            bubble.style.opacity = 0;
+            pupils.forEach(p => { p.style.background = "#333"; p.style.transform = "translate(0,0)"; p.style.height = "16px"; });
+
+            if(mood === 'watching') pupils.forEach(p => p.style.transform = "translate(3px, 3px)");
+            else if(mood === 'angry') {
+                body.style.backgroundColor = "var(--duo-red)";
+                pupils.forEach(p => { p.style.background = "black"; p.style.height = "4px"; });
+                ui.duo.style.animation = "shake 0.5s";
+                setTimeout(() => ui.duo.style.animation = "", 500);
+                bubble.innerText = "WRONG!"; bubble.style.opacity = 1; bubble.style.color = "var(--duo-red)";
+            } else if(mood === 'happy') {
+                ui.duo.style.transform = "translateY(-10px) scale(1.1)";
+                setTimeout(() => ui.duo.style.transform = "translateY(0) scale(1)", 300);
+                bubble.innerText = "Good Job!"; bubble.style.opacity = 1; bubble.style.color = "var(--duo-green)";
+            }
+        }
+
+        function playAudio(type) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            if (type === 'click') {
+                osc.frequency.setValueAtTime(600, ctx.currentTime);
+                gain.gain.setValueAtTime(0.05, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.05);
+                osc.start(); osc.stop(ctx.currentTime + 0.05);
+            } else if (type === 'success') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1000, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                osc.start(); osc.stop(ctx.currentTime + 0.4);
+            } else {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(50, ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start(); osc.stop(ctx.currentTime + 0.3);
+            }
+        }
+
+        function startConfetti() {
+            const canvas = document.getElementById('confetti');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            const pieces = Array.from({length: 100}).map(() => ({
+                x: Math.random() * canvas.width, y: Math.random() * canvas.height - canvas.height,
+                color: ['#58cc02', '#1cb0f6', '#ff9600', '#ff4b4b'][Math.floor(Math.random() * 4)],
+                size: Math.random() * 8 + 4, speed: Math.random() * 4 + 2, wobble: Math.random() * 10
+            }));
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                pieces.forEach(p => {
+                    p.y += p.speed; p.wobble += 0.1;
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(p.x + Math.sin(p.wobble)*2, p.y, p.size, p.size);
+                    if(p.y > canvas.height) p.y = -10;
+                });
+                requestAnimationFrame(draw);
+            }
+            draw();
+        }
+        init();
+    </script>
+</body>
+</html>
